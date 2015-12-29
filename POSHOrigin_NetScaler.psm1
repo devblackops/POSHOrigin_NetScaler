@@ -44,7 +44,7 @@ class LBVirtualServer {
     [string]$Comments = ''
 
     [DscProperty()]
-    [ValidateSet('ENABLED', 'DISABLED')]
+    #[ValidateSet('ENABLED', 'DISABLED', '')]
     [string]$State = 'ENABLED'
 
     [void]Set() {
@@ -184,7 +184,7 @@ class LBVirtualServer {
             $obj.Port = $vip.port
             $obj.ServiceType = $vip.servicetype
             $obj.LBMethod = $vip.lbmethod
-            $obj.State = $vip.state
+            $obj.State = $vip.curstate
         }
         Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
         return $obj
@@ -322,7 +322,7 @@ class LBServer {
         if ($null -ne $s) {
             $obj.Name = $s.Name
             $obj.IPAddress = $s.ipv46
-            $obj.comment = $s.comment
+            $obj.comments = $s.comment
             $obj.TrafficDomainId = $s.td
             $obj.State = $s.state
         }

@@ -27,12 +27,9 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Folder Include="Private\" />
-  </ItemGroup>
-  <ItemGroup>
+    <Compile Include="Invoke.ps1" />
     <Compile Include="POSHOrigin_NetScaler.psd1" />
     <Compile Include="POSHOrigin_NetScaler.psm1" />
-    <Compile Include="POSHOrigin_NetScaler.tests.ps1" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Target Name="Build" />
