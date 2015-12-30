@@ -28,10 +28,12 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="Invoke.ps1" />
+    <Compile Include="LICENSE" />
     <Compile Include="POSHOrigin_NetScaler.psd1" />
     <Compile Include="POSHOrigin_NetScaler.psm1" />
   </ItemGroup>
   <ItemGroup>
+    <Content Include="appveyor.yml" />
     <Content Include="README.md" />
   </ItemGroup>
   <ItemGroup>
