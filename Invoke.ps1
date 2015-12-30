@@ -25,6 +25,11 @@ $hash = @{
     NetScalerFQDN = $Options.Options.NetScalerFQDN
 }
 
+$export = $false
+if ($Options.options.ParameterExport) {
+    $export = [bool]$Options.options.ParameterExport
+}
+
 switch ($type) {
     'LBServer' {
         if ($Direct) {
@@ -32,6 +37,7 @@ switch ($type) {
             $hash.Comments = $Options.Options.Description
             $hash.TrafficDomainId = $Options.Options.TrafficDomainId
             $hash.State = $Options.Options.State
+            $hash.ParameterExport = $export
             return $hash
         } else {
             $confName = "$type" + '_' + $Options.Name
@@ -56,10 +62,10 @@ switch ($type) {
                     TrafficDomainId = $ResourceOptions.options.TrafficDomainId
                     Comments = $ResourceOptions.description
                     State = $ResourceOptions.options.State
+                    ParameterExport = $export
                 }
             }
         }
-        
     }
     'LBVirtualServer' {
         if ($Direct) {
@@ -68,6 +74,7 @@ switch ($type) {
             $hash.LBMethod = $Options.Options.LBMethod
             $hash.Comments = $Options.Options.Description
             $hash.State = $Options.Options.State
+            $hash.ParameterExport = $export
             return $hash
         } else {
             $confName = "$type" + '_' + $Options.Name
@@ -94,6 +101,7 @@ switch ($type) {
                     LBMethod = $ResourceOptions.options.lbmethod
                     Comments = $ResourceOptions.description
                     State = $ResourceOptions.options.State
+                    ParameterExport = $export
                 }
             }
         }

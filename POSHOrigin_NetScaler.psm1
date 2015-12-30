@@ -41,11 +41,14 @@ class LBVirtualServer {
 
     [DscProperty()]
     [ValidateLength(0, 256)]
-    [string]$Comments = ''
+    [string]$Comments = [string]::Empty
 
     [DscProperty()]
     #[ValidateSet('ENABLED', 'DISABLED', '')]
     [string]$State = 'ENABLED'
+
+    [DscProperty()]
+    [bool]$ParameterExport = $false
 
     [void]Set() {
         try {
@@ -103,6 +106,9 @@ class LBVirtualServer {
     }
 
     [bool]Test() {
+
+        $pass = $true
+
         try {
             Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
             # Try to get the VIP
@@ -114,52 +120,52 @@ class LBVirtualServer {
                     # Run tests against VIP
                     if ($vip.ipv46 -ne $this.IPAddress) {
                         Write-Verbose -Message "Virtual server IP address does not match [$($vip.IPAddress) <> $($this.IPAddress)"
-                        Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                        return $false
+                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                        $pass = $false
                     }
                     if ($vip.port -ne $this.Port) {
                         Write-Verbose -Message "Virtual server port does not match [$($vip.port) <> $($this.Port)"
-                        Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                        return $false
+                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                        $pass = $false
                     }
                     if ($vip.servicetype -ne $this.ServiceType) {
                         Write-Verbose -Message "Virtual server service type does not match [$($vip.servicetype) <> $($this.ServiceType)"
-                        Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                        return $false
+                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                        $pass = $false
                     }
                     if ($vip.lbmethod -ne $this.LBMethod) { 
                         Write-Verbose -Message "Virtual server load balance method does not match [$($vip.lbmethod) <> $($this.LBMethod)"
-                        Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                        return $false
+                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                        $pass = $false
                     }
                     if ($vip.comment -ne $this.Comments) {
-                        Write-Verbose -Message "Virtual server comments do not match [$($vip.comment) <> $($this.Comments)"
-                        Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                        return $false
+                        Write-Verbose -Message "Virtual server comments do not match [$($vip.comment) <> $($this.Comments)]"
+                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                        $pass = $false
                     }
                     if ($vip.curstate -ne 'DOWN') {
                         if ($this.State -eq 'DISABLED') { $this.State = 'OUT OF SERVICE'}
                         if ($vip.curstate -ne $this.State) { 
                             Write-Verbose -Message "Virtual server state does not match [$($vip.curstate) <> $($this.State)]"
-                            Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                            return $false
+                            #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                            $pass = $false
                         }
                     }
 
-                    Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    return $true
+                    #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                    #return $true
                 } else {
                     Write-Verbose -Message "VIP [$($this.Name)] not found"
-                    Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    return $false
+                    $pass = $false
                 }
             } else {
                 if ($null -ne $vip) {
-                    Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    return $false # VIP should not exist but does
+                    $pass = $false
+                    #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                    #return $false # VIP should not exist but does
                 } else {
-                    Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    return $true # VIP should not exist and doesn't. All good
+                    #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+                    #return $true # VIP should not exist and doesn't. All good
                 }
             }
         }
@@ -168,23 +174,50 @@ class LBVirtualServer {
             Write-Error 'There was a problem setting the resource'
             Write-Error "$($_.InvocationInfo.ScriptName)($($_.InvocationInfo.ScriptLineNumber)): $($_.InvocationInfo.Line)"
             Write-Error $_
-            return $true
+            #return $true
         }
+
+        # Export the resource parameters if told to.
+        # These values can be used by other DSC resources down the chain
+        if ($this.ParameterExport) {
+            $fileName = "LBVirtualServer_$($this.Name).json"
+            $json = $this.Get() | ConvertTo-Json
+            $folder = Join-Path -Path $env:USERPROFILE -ChildPath '.poshorigin'
+            if (-Not (Test-Path -Path $folder)) {
+                New-Item -ItemType Directory -Path $folder -Force
+            }
+            $fullPath = Join-Path -Path $folder -ChildPath $fileName
+            Write-Verbose -Message "Exporting parameters to [$fullPath]"
+            $json | Out-File -FilePath $fullPath -Force
+        }
+
+        try {
+            Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+        } catch {
+            # Do nothing
+        }
+        return $pass
     }
 
     [LBVirtualServer]Get() {
         Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
 
-        $vip = Get-NSLBVirtualServer -Name $this.Name
+        $vip = Get-NSLBVirtualServer -Name $this.Name -ErrorAction SilentlyContinue
         
         $obj = [LBVirtualServer]::new()
-        if ($null -ne $vip) {
-            $obj.Name = $vip.name
-            $obj.IPAddress = $vip.ipv46
+        $obj.Name = $this.Name
+        $obj.IPAddress = $this.IPAddress
+        $obj.NetScalerFQDN = $this.NetScalerFQDN
+        $obj.Credential = $this.Credential
+        $obj.ParameterExport = $this.ParameterExport
+        if ($vip) {
+            $obj.Ensure = [ensure]::Present
             $obj.Port = $vip.port
             $obj.ServiceType = $vip.servicetype
             $obj.LBMethod = $vip.lbmethod
             $obj.State = $vip.curstate
+        } else {
+            $obj.Ensure = [ensure]::Absent
         }
         Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
         return $obj
@@ -219,6 +252,9 @@ class LBServer {
     [DscProperty()]
     [ValidateSet('ENABLED', 'DISABLED')]
     [string]$State = 'ENABLED'
+
+    [DscProperty()]
+    [bool]$ParameterExport = $false
 
     [void]Set() {
         try {
@@ -266,51 +302,64 @@ class LBServer {
     }
 
     [bool]Test() {
+
+        $pass = $true
+
         Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
         # Try to get the server
         $server = Get-NSLBServer -Name $this.Name -ErrorAction SilentlyContinue
 
         if ($this.Ensure = [Ensure]::Present) {
-            if ($null -ne $server) {
+            if ($server) {
                 Write-Verbose -Message "Server [$($this.Name)] exists"
                 # Run tests against server
                 if ($server.ipaddress -ne $this.IPAddress) {
                     Write-Verbose -Message "Server IP address does not match [$($server.ipaddress) <> $($this.IPAddress)]"
-                    Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    return $false
+                    $pass = $false
                 }
                 if ($server.comment -ne $this.Comments) {
                     Write-Verbose -Message "Server comments do not match [$($server.comment) <> $($this.Comments)]"
-                    Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    return $false
+                    $pass = $false
                 }
                 if ($server.td -ne $this.TrafficDomainid) {
                     Write-Verbose -Message "Server traffic domain ID does not match [$($server.td) <> $($this.TrafficDomainId)]"
-                    Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    return $false
+                    $pass = $false
                 }
                 if ($server.state -ne $this.State) { 
                     Write-Verbose -Message "Server state does not match [$($server.state) <> $($this.State)]"
-                    Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    return $false
+                    $pass = $false
                 }
-
-                Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                return $true
             } else {
                 Write-Verbose -Message "Server [$($this.Name)] not found"
-                Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                return $false
+                $pass = $false
             }
         } else {
-            if ($null -ne $server) {
-                Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                return $false # Server should not exist but does
-            } else {
-                Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                return $true # Server should not exist and doesn't. All good
+            if ($server) {
+                $pass = $false
             }
         }
+
+        # Export the resource parameters if told to.
+        # These values can be used by other DSC resources down the chain
+        if ($this.ParameterExport) {
+            $fileName = "LBServer_$($this.Name).json"
+            $json = $this.Get() | ConvertTo-Json
+            $folder = Join-Path -Path $env:USERPROFILE -ChildPath '.poshorigin'
+            if (-Not (Test-Path -Path $folder)) {
+                New-Item -ItemType Directory -Path $folder -Force
+            }
+            $fullPath = Join-Path -Path $folder -ChildPath $fileName
+            Write-Verbose -Message "Exporting parameters to [$fullPath]"
+            $json | Out-File -FilePath $fullPath -Force
+        }
+
+        try {
+            Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+        } catch {
+            # Do nothing
+        }
+
+        return $pass
     }
 
     [LBServer]Get() {
@@ -319,12 +368,15 @@ class LBServer {
         $s = Get-NSLBServer -Name $this.Name -ErrorAction SilentlyContinue
         
         $obj = [LBServer]::new()
-        if ($null -ne $s) {
+        $obj.ParameterExport = $this.ParameterExport
+        if ($s) {
             $obj.Name = $s.Name
             $obj.IPAddress = $s.ipv46
             $obj.comments = $s.comment
             $obj.TrafficDomainId = $s.td
             $obj.State = $s.state
+        } else {
+            $obj.Ensure = [ensure]::Absent
         }
         Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
         return $obj
