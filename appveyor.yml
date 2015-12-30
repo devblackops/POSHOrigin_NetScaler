@@ -31,4 +31,4 @@ deploy_script:
       [System.IO.Compression.ZipFile]::CreateFromDirectory($pwd, $zipFilePath)
 
       Write-Host "Pushing package $zipFilePath as Appveyor artifact"
-      Push-AppveyorArtifact $zipFilePath
+      Push-AppveyorArtifact -FileName $zipFilePath
