@@ -31,6 +31,12 @@
     <Compile Include="POSHOrigin_NetScaler.psd1" />
     <Compile Include="POSHOrigin_NetScaler.psm1" />
   </ItemGroup>
+  <ItemGroup>
+    <Content Include="README.md" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Examples\" />
+  </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Target Name="Build" />
 </Project>
