@@ -5,11 +5,6 @@ os: WMF 5
 version: 1.1.{build}
 install:
   - cinst -y pester --version 3.3.13
-  - git clone https://github.com/PowerShell/DscResource.Tests
-  - ps: Push-Location
-  - cd DscResource.Tests
-  - ps: Import-Module .\TestHelper.psm1 -force
-  - ps: Pop-Location
   - ps: Get-PackageProvider -name nuget -ForceBootStrap -Force
 
 #---------------------------------#
