@@ -3,7 +3,7 @@
 RootModule = 'POSHOrigin_NetScaler.psm1'
 
 # Version number of this module.
-ModuleVersion = '1.1'
+ModuleVersion = '1.1.1'
 
 # ID used to uniquely identify this module
 GUID = 'bd4390dc-a8ad-4bce-8d69-f53ccf8e4163'
@@ -25,4 +25,15 @@ RequiredModules = 'NetScaler'
 
 # DSC resources to export from this module
 DscResourcesToExport = @('LBVirtualServer', 'LBServer')
+
+Tags = @(
+    'Desired State Configuration',
+    'DSC',
+    'POSHOrigin',
+    'Citrix',
+    'NetScaler',
+    'Load balancing',
+    'Infrastructure as Code',
+    'IaC'
+)
 }
