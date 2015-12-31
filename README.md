@@ -1,3 +1,4 @@
+[![Stories in Ready](https://badge.waffle.io/devblackops/POSHOrigin_NetScaler.png?label=ready&title=Ready)](https://waffle.io/devblackops/POSHOrigin_NetScaler)
 [![Build status](https://ci.appveyor.com/api/projects/status/5l0movhn89rexh0g?svg=true)](https://ci.appveyor.com/project/devblackops/poshorigin-netscaler)
 
 # POSHOrigin_NetScaler
