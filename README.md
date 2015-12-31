@@ -55,7 +55,8 @@ Parameters
 * Initial release
 
 ## Examples
-## POSHOrigin LBServer Examples
+
+### LBServer
 
 This example shows how to use the **LBServer** resource within the context of a [POSHOrigin](https://github.com/devblackops/POSHOrigin) configuration file.
 
@@ -117,7 +118,7 @@ Configuration Example_LBServer {
 }
 ```
 
-### POSHOrigin example for LBVirtualServer
+### LBVirtualServer
 
 This example shows how to use the **LBVirtualServer** resource within the context of a [POSHOrigin](https://github.com/devblackops/POSHOrigin) configuration file.
 
