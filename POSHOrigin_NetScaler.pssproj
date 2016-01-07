@@ -27,10 +27,15 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="Examples\Example_LBServer.ps1" />
+    <Compile Include="Examples\Example_LBVirtualServer.ps1" />
+    <Compile Include="Examples\Example_POSHOrigin_LBServer.ps1" />
+    <Compile Include="Examples\Example_POSHOrigin_LBVirtualServer.ps1" />
     <Compile Include="Invoke.ps1" />
     <Compile Include="LICENSE" />
     <Compile Include="POSHOrigin_NetScaler.psd1" />
     <Compile Include="POSHOrigin_NetScaler.psm1" />
+    <Compile Include="Tests\AppVeyor.Pester.ps1" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="appveyor.yml" />
