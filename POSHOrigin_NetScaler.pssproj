@@ -27,25 +27,29 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Compile Include="Examples\Example_LBServer.ps1" />
-    <Compile Include="Examples\Example_LBVirtualServer.ps1" />
-    <Compile Include="Examples\Example_POSHOrigin_LBServer.ps1" />
-    <Compile Include="Examples\Example_POSHOrigin_LBVirtualServer.ps1" />
-    <Compile Include="Invoke.ps1" />
+    <Compile Include="POSHOrigin_NetScaler\Examples\Example_LBServer.ps1" />
+    <Compile Include="POSHOrigin_NetScaler\Examples\Example_LBVirtualServer.ps1" />
+    <Compile Include="POSHOrigin_NetScaler\Examples\Example_POSHOrigin_LBServer.ps1" />
+    <Compile Include="POSHOrigin_NetScaler\Examples\Example_POSHOrigin_LBVirtualServer.ps1" />
+    <Compile Include="POSHOrigin_NetScaler\Invoke.ps1" />
     <Compile Include="LICENSE" />
-    <Compile Include="POSHOrigin_NetScaler.psd1" />
-    <Compile Include="POSHOrigin_NetScaler.psm1" />
+    <Compile Include="POSHOrigin_NetScaler\POSHOrigin_NetScaler.psd1" />
+    <Compile Include="POSHOrigin_NetScaler\POSHOrigin_NetScaler.psm1" />
     <Compile Include="Tests\AppVeyor.Pester.ps1" />
+    <Compile Include="Tests\Manifest.Tests.ps1" />
+    <Compile Include="Tests\Meta.Tests.ps1" />
+    <Compile Include="Tests\MetaFixers.psm1" />
+    <Compile Include="Tests\TestHelper.psm1" />
   </ItemGroup>
   <ItemGroup>
     <Content Include="appveyor.yml" />
+    <Content Include="CONTRIBUTING.md" />
     <Content Include="README.md" />
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Examples\" />
+    <Folder Include="POSHOrigin_NetScaler\" />
+    <Folder Include="POSHOrigin_NetScaler\Examples\" />
     <Folder Include="Tests\" />
-    <Folder Include="Tests\Integration\" />
-    <Folder Include="Tests\Unit\" />
   </ItemGroup>
   <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
   <Target Name="Build" />
