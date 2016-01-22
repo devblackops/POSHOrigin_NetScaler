@@ -49,6 +49,16 @@ switch ($type) {
 
                 Import-DscResource -Name LBServer -ModuleName POSHOrigin_NetScaler
 
+                # Credentials may be specified in line. Test for that
+                if ($ResourceOptions.Options.Credential -is [pscredential]) {
+                    $cred = $ResourceOptions.Options.Credential
+                }
+
+                # Credentials may be listed under secrets. Test for that
+                if ($ResourceOptions.options.secrets.Credential) {
+                    $cred = $ResourceOptions.options.secrets.Credential.credential
+                }
+
                 if (-Not $ResourceOptions.options.State) {
                     $ResourceOptions.options | Add-Member -MemberType NoteProperty -Name State -Value 'ENABLED'
                 }
@@ -57,10 +67,10 @@ switch ($type) {
                     Ensure = $ResourceOptions.options.Ensure
                     Name = $ResourceOptions.Name
                     NetScalerFQDN = $ResourceOptions.options.netscalerfqdn
-                    Credential = $ResourceOptions.options.secrets.AdminUser.Credential
+                    Credential = $cred
                     IPAddress = $ResourceOptions.options.IPAddress
                     TrafficDomainId = $ResourceOptions.options.TrafficDomainId
-                    Comments = $ResourceOptions.description
+                    Comments = $ResourceOptions.options.comments
                     State = $ResourceOptions.options.State
                     ParameterExport = $export
                 }
@@ -73,6 +83,8 @@ switch ($type) {
             $hash.Port = $Options.Options.Port
             $hash.LBMethod = $Options.Options.LBMethod
             $hash.Comments = $Options.Options.Description
+            $hash.ServiceGroup = $Options.Options.ServiceGroup
+            $hash.Service = $Options.Options.Service
             $hash.State = $Options.Options.State
             $hash.ParameterExport = $export
             return $hash
@@ -86,6 +98,16 @@ switch ($type) {
 
                 Import-DscResource -Name LBVirtualServer -ModuleName POSHOrigin_NetScaler
 
+                # Credentials may be specified in line. Test for that
+                if ($ResourceOptions.Options.Credential -is [pscredential]) {
+                    $cred = $ResourceOptions.Options.Credential
+                }
+
+                # Credentials may be listed under secrets. Test for that
+                if ($ResourceOptions.options.secrets.Credential) {
+                    $cred = $ResourceOptions.options.secrets.Credential.credential
+                }
+
                 if (-Not $ResourceOptions.options.State) {
                     $ResourceOptions.options | Add-Member -MemberType NoteProperty -Name State -Value 'ENABLED'
                 }
@@ -94,12 +116,14 @@ switch ($type) {
                     Ensure = $ResourceOptions.options.Ensure
                     Name = $ResourceOptions.Name
                     NetScalerFQDN = $ResourceOptions.options.netscalerfqdn
-                    Credential = $ResourceOptions.options.secrets.AdminUser.Credential
+                    Credential = $cred
                     IPAddress = $ResourceOptions.options.IPAddress
                     Port = $ResourceOptions.options.Port
                     ServiceType = $ResourceOptions.options.servicetype
                     LBMethod = $ResourceOptions.options.lbmethod
-                    Comments = $ResourceOptions.description
+                    ServiceGroup = $ResourceOptions.options.servicegroup
+                    Service = $ResourceOptions.options.service
+                    Comments = $ResourceOptions.options.comments
                     State = $ResourceOptions.options.State
                     ParameterExport = $export
                 }

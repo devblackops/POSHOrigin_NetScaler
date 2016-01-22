@@ -40,6 +40,12 @@ class LBVirtualServer {
     [string]$LBMethod = 'ROUNDROBIN'
 
     [DscProperty()]
+    [string]$Service
+
+    [DscProperty()]
+    [string]$ServiceGroup
+
+    [DscProperty()]
     [ValidateLength(0, 256)]
     [string]$Comments = [string]::Empty
 
@@ -50,52 +56,150 @@ class LBVirtualServer {
     [DscProperty()]
     [bool]$ParameterExport = $false
 
+    [LBVirtualServer]Get() {
+        [ref]$t = $null
+        if ([ipaddress]::TryParse($this.NetScalerFQDN,$t)) {
+            Connect-NetScaler -IPAddress $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+        } else {
+            Connect-NetScaler -Hostname $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+        }
+
+        $vip = Get-NSLBVirtualServer -Name $this.Name -Verbose:$false -ErrorAction SilentlyContinue
+        
+        $obj = [LBVirtualServer]::new()
+        $obj.Name = $this.Name
+        $obj.IPAddress = $this.IPAddress
+        $obj.NetScalerFQDN = $this.NetScalerFQDN
+        $obj.Credential = $this.Credential
+        $obj.ParameterExport = $this.ParameterExport
+        if ($vip) {
+            $obj.Ensure = [ensure]::Present
+            $obj.Port = $vip.port
+            $obj.ServiceType = $vip.servicetype
+            $obj.LBMethod = $vip.lbmethod
+            $obj.State = $vip.curstate
+        } else {
+            $obj.Ensure = [ensure]::Absent
+        }
+        Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+        return $obj
+    }
+
     [void]Set() {
         try {
-            Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
-            # Try to get the VIP
-            $vip = Get-NSLBVirtualServer -Name $this.Name
-            if ($null -ne $vip) {
-                # Run tests and set any needed attributes to match desired configuration
-                if ($vip.ipv46 -ne $this.IPAddress) {
-                    Set-NSLBVirtualServer -Name $this.Name -IPAddress $this.IPAddress -Confirm:$false
-                    Write-Verbose -Message "Setting virtual server IP [$($this.IPAddress)]"
-                }
-                if ($vip.port -ne $this.Port) {
-                    Write-Warning -Message 'NetScaler does not support changing virtual server port on an existing virtual server. Virtual server must be deleted and recreated.'
-                }
-                if ($vip.servicetype -ne $this.ServiceType) {
-                    Write-Warning -Message 'NetScaler does not support changing virtual server service type on an existing virtual server. Virtual server must be deleted and recreated.'
-                }
-                if ($vip.lbmethod -ne $this.LBMethod) { 
-                    Set-NSLBVirtualServer -Name $this.Name -LBMethod $this.LBMethod
-                    Write-Verbose -Message "Setting virtual server load balance method [$($this.LBMethod)]"
-                }
-                if ($vip.comment -ne $this.Comments) {
-                    Write-Verbose -Message "Setting virtual server comments [$($this.Comments)]"
-                    Set-NSLBVirtualServer -Name $this.Name -Comment $this.Comments -Force
-                }
-                if ($vip.state -ne $this.State) { 
-                    Write-Verbose -Message "Setting virtual server state [$($this.State)]"
-                    if ($this.State -eq 'ENABLED') {
-                        Enable-NSLBVirtualServer -Name $this.Name -Force
+            $vip = $this.Get()
+
+            switch ($this.Ensure) {
+                'Present' {
+                    [ref]$t = $null
+                    if ([ipaddress]::TryParse($this.NetScalerFQDN,$t)) {
+                        Connect-NetScaler -IPAddress $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
                     } else {
-                        Disable-NSLBVirtualServer -Name $this.Name -Force
+                        Connect-NetScaler -Hostname $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+                    }
+
+                    # Does the record already exist?
+                    if ($vip.Ensure -ne [ensure]::Present) {
+                        # Create VIP
+                        Write-Verbose -Message "Creating virtual server [$($this.Name)]"
+                        $params = @{
+                            Name = $this.Name
+                            IPAddress = $this.IPAddress
+                            ServiceType = $this.ServiceType
+                            Port = $this.Port
+                            LBMethod = $this.LBMethod
+                            Comment = $this.Comments
+                            Verbose = $false
+                            Confirm = $false
+                        }
+                        New-NSLBVirtualServer @params
+                        $vip = $this.Get()
+                        [ref]$t = $null
+                        if ([ipaddress]::TryParse($this.NetScalerFQDN,$t)) {
+                            Connect-NetScaler -IPAddress $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+                        } else {
+                            Connect-NetScaler -Hostname $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+                        }
+                    }
+
+                    # Run tests and set any needed attributes to match desired configuration
+
+                    # IP check
+                    if ($vip.IPAddress -ne $this.IPAddress) {
+                        Set-NSLBVirtualServer -Name $this.Name -IPAddress $this.IPAddress -Verbose:$false -Confirm:$false
+                        Write-Verbose -Message "Setting virtual server IP [$($this.IPAddress)]"
+                    }
+
+                    # Port check
+                    if ($vip.Port -ne $this.Port) {
+                        Write-Warning -Message 'NetScaler does not support changing virtual server port on an existing virtual server. Virtual server must be deleted and recreated.'
+                    }
+
+                    # Service type check
+                    if ($vip.ServiceType -ne $this.ServiceType) {
+                        Write-Warning -Message 'NetScaler does not support changing virtual server service type on an existing virtual server. Virtual server must be deleted and recreated.'
+                    }
+
+                    # LB method check
+                    if ($vip.LBMethod -ne $this.LBMethod) { 
+                        Set-NSLBVirtualServer -Name $this.Name -LBMethod $this.LBMethod -Verbose:$false -Force
+                        Write-Verbose -Message "Setting virtual server load balance method [$($this.LBMethod)]"
+                    }
+
+                    # Comments check
+                    if ($vip.Comments -ne $this.Comments) {
+                        Write-Verbose -Message "Setting virtual server comments [$($this.Comments)]"
+                        Set-NSLBVirtualServer -Name $this.Name -Comment $this.Comments -Verbose:$false -Force
+                    }
+
+                    # Service group binding check
+                    $bindings = Get-NSLBVirtualServerBinding -Name $this.Name -Verbose:$false -ErrorAction SilentlyContinue
+                    $sgBinding = $bindings | where servicegroupname -eq $this.ServiceGroup
+                    if ($this.ServiceGroup) {
+                        if (-Not $sgBinding) {
+                            Write-Verbose -Message "Adding virtual server service group binding [$($this.ServiceGroup)]"
+                            Add-NSLBVirtualServerBinding -VirtualServerName $this.Name -ServiceGroupName $this.ServiceGroup -Verbose:$false -Force
+                        }
+                    }
+
+                    # Service binding check
+                    $bindings = Get-NSLBVirtualServerBinding -Name $this.Name -Verbose:$false -ErrorAction SilentlyContinue
+                    $serviceBinding = $bindings | where servicename -eq $this.Service
+                    if ($this.Service) {
+                        if (-Not $serviceBinding) {
+                            Write-Verbose -Message "Adding virtual server service binding [$($this.Service)]"
+                            Add-NSLBVirtualServerBinding -VirtualServerName $this.Name -ServiceName $this.Service -Verbose:$false -Force
+                        }
+                    }
+
+                    # State check
+                    if ($vip.State -ne 'DOWN') {
+                        if ($vip.State -ne $this.State) { 
+                            Write-Verbose -Message "Setting virtual server state [$($this.State)]"
+                            if ($this.State -eq 'ENABLED') {
+                                Enable-NSLBVirtualServer -Name $this.Name -Verbose:$false -Force
+                                # Check that the enable worked
+                                $vip2 = Get-NSLBVirtualServer -Name $this.Name -Verbose:$false
+                                if (-Not $vip2.State -eq 'ENABLED') {
+                                    Write-Error -Message "Enabling the virtual server was unsuccessful. The current state is $($vip.curstate)"
+                                }
+                            } else {
+                                Disable-NSLBVirtualServer -Name $this.Name -Verbose:$false -Force
+                            }
+                        }
                     }
                 }
-            } else {
-                Write-Verbose -Message "Creating virtual server [$($this.Name)]"
-                $params = @{
-                    Name = $this.Name
-                    IPAddress = $this.IPAddress
-                    ServiceType = $this.ServiceType
-                    Port = $this.Port
-                    LBMethod = $this.LBMethod
-                    Comment = $this.Comments
-                    Confirm = $false
+                'Absent' {
+                    if ($vip.Ensure -eq [ensure]::Present) {
+                        # Remove VIP
+                        Write-Verbose -Message "Removing virtual server: $($this.Name)"
+                        Remove-NSLBVirtualServer -Name $this.Name -Verbose:$false -Force
+                    } else {
+                        # Do nothing
+                    }
                 }
-                $newVIP = New-NSLBVirtualServer @params
             }
+
             Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
         } catch {
             Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
@@ -107,67 +211,108 @@ class LBVirtualServer {
 
     [bool]Test() {
 
+        $vip = $this.Get()
         $pass = $true
-
         try {
-            Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
-            # Try to get the VIP
-            $vip = Get-NSLBVirtualServer -Name $this.Name
+            Write-Verbose -Message "Validating that virtual server $($this.Name) is $($this.Ensure.ToString().ToLower())"
+            if ($this.Ensure -ne $vip.Ensure) { return $false }
 
-            if ($this.Ensure = [Ensure]::Present) {
+            if ($this.Ensure -eq [Ensure]::Present) {
                 if ($null -ne $vip) {
                     Write-Verbose -Message "VIP [$($this.Name)] exists"
-                    # Run tests against VIP
-                    if ($vip.ipv46 -ne $this.IPAddress) {
+                    $bindings = Get-NSLBVirtualServerBinding -Name $this.Name -Verbose:$false -ErrorAction SilentlyContinue
+
+                    # IP check
+                    if ($vip.IPAddress -ne $this.IPAddress) {
                         Write-Verbose -Message "Virtual server IP address does not match [$($vip.IPAddress) <> $($this.IPAddress)"
-                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
                         $pass = $false
                     }
-                    if ($vip.port -ne $this.Port) {
+
+                    # Port check
+                    if ($vip.Port -ne $this.Port) {
                         Write-Verbose -Message "Virtual server port does not match [$($vip.port) <> $($this.Port)"
-                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
                         $pass = $false
                     }
-                    if ($vip.servicetype -ne $this.ServiceType) {
+
+                    # Service type check
+                    if ($vip.ServiceType -ne $this.ServiceType) {
                         Write-Verbose -Message "Virtual server service type does not match [$($vip.servicetype) <> $($this.ServiceType)"
-                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
                         $pass = $false
                     }
-                    if ($vip.lbmethod -ne $this.LBMethod) { 
+
+                    # LB method check
+                    if ($vip.LBMethod -ne $this.LBMethod) { 
                         Write-Verbose -Message "Virtual server load balance method does not match [$($vip.lbmethod) <> $($this.LBMethod)"
-                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
                         $pass = $false
                     }
+
+                    # Comment check
                     if ($vip.comment -ne $this.Comments) {
                         Write-Verbose -Message "Virtual server comments do not match [$($vip.comment) <> $($this.Comments)]"
-                        #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
                         $pass = $false
                     }
+
+                    # Service group binding check
+                    if ($this.ServiceGroup) {
+                        $sgBinding = $bindings | where servicegroupname -eq $this.ServiceGroup
+                        if (-Not $sgBinding) { 
+                            Write-Verbose -Message 'Virtual server has no service group binding'
+                            $pass = $false
+                        } else {
+                            if ($sgBinding.servicegroupname -ne $this.ServiceGroup) {
+                                Write-Verbose -Message "Virtual server binding service group does not match [$($sgBinding.servicegroupname) <> $($this.ServiceGroup)]"
+                                $pass = $false
+                            }
+                        }
+                    } else {
+                        if ($this.Service) {
+                            $unknownBindings = $bindings | where servicename -ne $this.Service
+                            if ($unknownBindings) {
+                                $pass = $false
+                                foreach ($unknownBinding in $unknownBindings) {
+                                    Write-Verbose -Message "Virtual server service group binding exists [$($unknownBinding.servicegroupname)] and should not"
+                                }
+                            }
+                        }
+                    }
+
+                    # Service binding check
+                    $serviceBinding = $bindings | where servicename -eq $this.Service
+                    if ($this.Service) {
+                        if (-Not $serviceBinding) { 
+                            Write-Verbose -Message 'Virtual server has no service binding'
+                            $pass = $false
+                        } else {
+                            if ($serviceBinding.servicename -ne $this.Service) {
+                                Write-Verbose -Message "Virtual server binding service does not match [$($serviceBinding.servicename) <> $($this.Service)]"
+                                $pass = $false
+                            }
+                        }
+                    } else {
+                        if ($this.Service) {
+                            $unknownBindings = $bindings | where servicegroupname -ne $this.ServiceGroup
+                            if ($unknownBindings) {
+                                $pass = $false
+                                foreach ($unknownBinding in $unknownBindings) {
+                                    Write-Verbose -Message "Virtual server service group binding exists [$($unknownBinding.servicegroupname)] and should not"
+                                }
+                            }
+                        }
+                    }
+
+                    # State check
                     if ($vip.curstate -ne 'DOWN') {
                         if ($this.State -eq 'DISABLED') { $this.State = 'OUT OF SERVICE'}
                         if ($vip.curstate -ne $this.State) { 
                             Write-Verbose -Message "Virtual server state does not match [$($vip.curstate) <> $($this.State)]"
-                            #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
                             $pass = $false
                         }
                     }
-
-                    #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    #return $true
                 } else {
                     Write-Verbose -Message "VIP [$($this.Name)] not found"
                     $pass = $false
                 }
-            } else {
-                if ($null -ne $vip) {
-                    $pass = $false
-                    #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    #return $false # VIP should not exist but does
-                } else {
-                    #Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-                    #return $true # VIP should not exist and doesn't. All good
-                }
-            }
+            } 
         }
         catch {
             Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
@@ -199,29 +344,7 @@ class LBVirtualServer {
         return $pass
     }
 
-    [LBVirtualServer]Get() {
-        Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
-
-        $vip = Get-NSLBVirtualServer -Name $this.Name -ErrorAction SilentlyContinue
-        
-        $obj = [LBVirtualServer]::new()
-        $obj.Name = $this.Name
-        $obj.IPAddress = $this.IPAddress
-        $obj.NetScalerFQDN = $this.NetScalerFQDN
-        $obj.Credential = $this.Credential
-        $obj.ParameterExport = $this.ParameterExport
-        if ($vip) {
-            $obj.Ensure = [ensure]::Present
-            $obj.Port = $vip.port
-            $obj.ServiceType = $vip.servicetype
-            $obj.LBMethod = $vip.lbmethod
-            $obj.State = $vip.curstate
-        } else {
-            $obj.Ensure = [ensure]::Absent
-        }
-        Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
-        return $obj
-    }
+    
 }
 
 [DscResource()]
@@ -258,25 +381,31 @@ class LBServer {
 
     [void]Set() {
         try {
-            Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+            [ref]$t = $null
+            if ([ipaddress]::TryParse($this.NetScalerFQDN,$t)) {
+                Connect-NetScaler -IPAddress $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+            } else {
+                Connect-NetScaler -Hostname $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+            }
             # Try to get the server
-            $server = Get-NSLBServer -Name $this.Name -ErrorAction SilentlyContinue
+            $server = Get-NSLBServer -Name $this.Name -Verbose:$false -ErrorAction SilentlyContinue
+
             if ($null -ne $server) {
                 # Run tests and set any needed attributes to match desired configuration
                 if ($server.ipaddress -ne $this.IPAddress) {
                     Write-Verbose -Message "Setting server IP [$($this.IPAddress)]"
-                    Set-NSLBServer -Name $this.Name -IPAddress $this.IPAddress -Force
+                    Set-NSLBServer -Name $this.Name -IPAddress $this.IPAddress -Force -Verbose:$false
                 }
                 if ($server.comment -ne $this.Comments) {
                     Write-Verbose -Message "Setting server comments [$($this.Comments)]"
-                    Set-NSLBServer -Name $this.Name -Comment $this.Comments -Force
+                    Set-NSLBServer -Name $this.Name -Comment $this.Comments -Force -Verbose:$false
                 }
                 if ($server.state -ne $this.State) { 
                     Write-Verbose -Message "Setting server state [$($this.State)]"
                     if ($this.State -eq 'ENABLED') {
-                        Enable-NSLBServer -Name $this.Name -Force
+                        Enable-NSLBServer -Name $this.Name -Force -Verbose:$false
                     } else {
-                        Disable-NSLBServer -Name $this.Name -Force
+                        Disable-NSLBServer -Name $this.Name -Force -Verbose:$false
                     }
                 }
             } else {
@@ -286,18 +415,23 @@ class LBServer {
                     IPAddress = $this.IPAddress
                     Comment = $this.Comments
                     Confirm = $false
+                    Verbose = $false
                 }
                 if ($null -ne $this.TrafficDomainId) {
                     $params.TrafficDomainId = $this.TrafficDomainId
                 }
-                $newVIP = New-NSLBServer @params
+                New-NSLBServer @params
             }
-            Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+            
         } catch {
-            Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
             Write-Error 'There was a problem setting the resource'
             Write-Error "$($_.InvocationInfo.ScriptName)($($_.InvocationInfo.ScriptLineNumber)): $($_.InvocationInfo.Line)"
             Write-Error $_
+        }
+        try {
+            Disconnect-NetScaler -Verbose:$false -ErrorAction SilentlyContinue
+        } catch {
+            # Do nothing
         }
     }
 
@@ -305,9 +439,14 @@ class LBServer {
 
         $pass = $true
 
-        Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+        [ref]$t = $null
+        if ([ipaddress]::TryParse($this.NetScalerFQDN,$t)) {
+            Connect-NetScaler -IPAddress $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+        } else {
+            Connect-NetScaler -Hostname $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+        }
         # Try to get the server
-        $server = Get-NSLBServer -Name $this.Name -ErrorAction SilentlyContinue
+        $server = Get-NSLBServer -Name $this.Name -Verbose:$false -ErrorAction SilentlyContinue
 
         if ($this.Ensure = [Ensure]::Present) {
             if ($server) {
@@ -363,14 +502,26 @@ class LBServer {
     }
 
     [LBServer]Get() {
-        Connect-NetScaler -NSIP $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+        [ref]$t = $null
+        if ([ipaddress]::TryParse($this.NetScalerFQDN,$t)) {
+            Connect-NetScaler -IPAddress $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+        } else {
+            Connect-NetScaler -Hostname $this.NetScalerFQDN -Credential $this.Credential -Verbose:$false
+        }
 
-        $s = Get-NSLBServer -Name $this.Name -ErrorAction SilentlyContinue
-        
+        $s = Get-NSLBServer -Name $this.Name -Verbose:$false -ErrorAction SilentlyContinue
+
         $obj = [LBServer]::new()
+        $obj.Name = $this.Name
+        $obj.IPAddress = $this.IPAddress
+        $obj.Comments = $this.Comments
+        $obj.TrafficDomainId = $this.TrafficDomainId
+        $obj.State = $this.State
+        $obj.Credential = $this.Credential
+        $obj.NetScalerFQDN = $this.NetScalerFQDN
         $obj.ParameterExport = $this.ParameterExport
         if ($s) {
-            $obj.Name = $s.Name
+            $obj.Ensure = [ensure]::Present
             $obj.IPAddress = $s.ipv46
             $obj.comments = $s.comment
             $obj.TrafficDomainId = $s.td
